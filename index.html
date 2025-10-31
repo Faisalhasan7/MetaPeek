@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MetaPeek</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -533,11 +533,14 @@
         }
 
         function getGpsCoords(tags) {
-            // 'exifr' makes this much easier!
             const { latitude, longitude } = tags;
-            if (latitude === undefined || longitude === undefined) {
+            
+            // NEW CHECK:
+            // Checks for undefined, null, AND NaN (Not a Number)
+            if (latitude === undefined || longitude === undefined || isNaN(latitude) || isNaN(longitude)) {
                 return null;
             }
+            
             return { lat: latitude, lon: longitude };
         }
 
