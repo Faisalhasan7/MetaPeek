@@ -430,9 +430,17 @@
 
             // --- THIS IS THE UPDATED PART ---
             try {
-                // Use the new 'exifr' library (it's async)
-                const allTags = await exifr.parse(file, true);
-
+                // This is the correct way to pass options
+                const options = {
+                    wholeFile: true, // Read the entire file first to avoid mobile parsing errors
+                    gps: true        // Explicitly tell it to find and parse the GPS segment
+                };
+                
+                // Pass the options object to the parse function
+                const allTags = await exifr.parse(file, options);
+                
+                // --- END OF FIX ---
+                
                 loader.classList.add('hidden');
 
                 if (Object.keys(allTags).length === 0) {
@@ -446,7 +454,7 @@
                 metadataContainer.classList.remove('hidden');
                 
                 displayMetadata(allTags);
-                displayGpsMap(allTags); // This function is also updated (see below)
+                displayGpsMap(allTags);
 
             } catch (error) {
                 console.error('Error parsing EXIF:', error);
