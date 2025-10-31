@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MetaPeek</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -159,7 +159,7 @@
                     Select Image
                 </label>
                 
-                <input type="file" id="imageInput" accept="image/jpeg,image/jpg" class="hidden">
+               <input type="file" id="imageInput" accept="image/*" class="hidden">
                 
                 <p class="text-white/70 text-sm">or drag and drop here</p>
             </div>
@@ -404,8 +404,7 @@
             loadMapButton.classList.remove('hidden');
         }
 
-        function processFile(file) {
-            // Don't call resetUI() here, as it navigates back
+        async function processFile(file) {
             // Manually reset just the results part
             resultsCard.classList.add('hidden');
             loader.classList.add('hidden');
@@ -429,9 +428,12 @@
 
             fileName.textContent = file.name;
 
-            EXIF.getData(file, function() {
+            // --- THIS IS THE UPDATED PART ---
+            try {
+                // Use the new 'exifr' library (it's async)
+                const allTags = await exifr.parse(file);
+
                 loader.classList.add('hidden');
-                const allTags = EXIF.getAllTags(this);
 
                 if (Object.keys(allTags).length === 0) {
                     showError('No EXIF metadata found in this image.');
@@ -444,8 +446,13 @@
                 metadataContainer.classList.remove('hidden');
                 
                 displayMetadata(allTags);
-                displayGpsMap(allTags);
-            });
+                displayGpsMap(allTags); // This function is also updated (see below)
+
+            } catch (error) {
+                console.error('Error parsing EXIF:', error);
+                showError('Could not parse metadata. The file might be corrupt.');
+            }
+            // --- END OF UPDATED PART ---
         }
 
         function showError(message) {
@@ -526,20 +533,12 @@
         }
 
         function getGpsCoords(tags) {
-            const { GPSLatitude, GPSLongitude, GPSLatitudeRef, GPSLongitudeRef } = tags;
-            if (!GPSLatitude || !GPSLongitude || !GPSLatitudeRef || !GPSLongitudeRef) {
+            // 'exifr' makes this much easier!
+            const { latitude, longitude } = tags;
+            if (latitude === undefined || longitude === undefined) {
                 return null;
             }
-            
-            try {
-                const lat = convertDMSToDD(GPSLatitude, GPSLatitudeRef);
-                const lon = convertDMSToDD(GPSLongitude, GPSLongitudeRef);
-                if (isNaN(lat) || isNaN(lon)) throw new Error("Invalid GPS coordinates.");
-                return { lat, lon };
-            } catch (error) {
-                console.error("Error processing GPS data:", error);
-                return null;
-            }
+            return { lat: latitude, lon: longitude };
         }
 
         function displayGpsMap(tags) {
@@ -547,9 +546,10 @@
 
             if (coords) {
                 const { lat, lon } = coords;
+                // Use .toFixed(6) for a standard coordinate display
                 coordinatesText.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
 
-                const zoom = 0.005;
+                const zoom = 0.005; // This is a good default zoom level
                 mapUrlToLoad = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - zoom},${lat - zoom},${lon + zoom},${lat + zoom}&layer=mapnik&marker=${lat},${lon}`;
                 
                 mapContainer.classList.remove('hidden');
