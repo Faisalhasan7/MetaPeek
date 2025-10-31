@@ -433,6 +433,8 @@
                 // Use the new 'exifr' library (it's async)
                 const allTags = await exifr.parse(file);
 
+                alert('Latitude: ' + allTags.latitude + ', Longitude: ' + allTags.longitude);
+
                 loader.classList.add('hidden');
 
                 if (Object.keys(allTags).length === 0) {
