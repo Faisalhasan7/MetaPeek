@@ -431,9 +431,7 @@
             // --- THIS IS THE UPDATED PART ---
             try {
                 // Use the new 'exifr' library (it's async)
-                const allTags = await exifr.parse(file);
-
-                alert('Latitude: ' + allTags.latitude + ', Longitude: ' + allTags.longitude);
+                const allTags = await exifr.parse(file, true);
 
                 loader.classList.add('hidden');
 
