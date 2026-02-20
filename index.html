@@ -609,13 +609,6 @@
                 }
             }
 
-            function convertDMSToDD(dms, ref) {
-                if (!dms || dms.length !== 3) return NaN;
-                let dd = dms[0] + dms[1] / 60 + dms[2] / 3600;
-                if (ref === 'S' || ref === 'W') dd = dd * -1;
-                return dd;
-            }
-
             function formatExposure(val) {
                 if (!val) return null;
                 if (val < 1) return `1/${Math.round(1 / val)} s`;
