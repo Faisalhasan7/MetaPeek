@@ -48,7 +48,3 @@ MetaPeek is designed with strict client-side privacy:
 - Vanilla JavaScript  
 - EXIFR (client-side EXIF parser)  
 - OpenStreetMap embed  
-
----
-
-## Project Structure
