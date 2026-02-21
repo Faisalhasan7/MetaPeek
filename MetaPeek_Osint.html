@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaPeek</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .gradient-card { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .card-shadow { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); }
+        .hover-lift { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 25px 35px -5px rgba(0,0,0,0.15), 0 15px 15px -5px rgba(0,0,0,0.08); }
+        .upload-card.dragover { border-style: solid; border-color: rgba(255,255,255,0.8); background-color: rgba(255,255,255,0.3); transform: scale(1.03); }
+        .loader { border: 4px solid rgba(102,126,234,0.2); border-top: 4px solid #667eea; border-radius: 50%; width: 50px; height: 50px; animation: spin 0.8s linear infinite; margin: 2rem auto; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-slow { animation: pulse 3s cubic-bezier(0.4,0,0.6,1) infinite; }
+        .metadata-row { transition: all 0.2s ease; }
+        .metadata-row:hover { background-color: rgba(102,126,234,0.05); transform: translateX(4px); }
+        .btn { padding: 0.75rem 1.25rem; font-weight: 600; border-radius: 0.75rem; transition: all 0.3s ease; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-align: center; border: none; }
+        .btn-primary { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; box-shadow: 0 4px 20px -3px rgba(245,87,108,0.5); }
+        .btn-primary:hover { box-shadow: 0 10px 25px -3px rgba(245,87,108,0.6); transform: translateY(-2px); }
+        .btn-secondary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 4px 20px -3px rgba(102,126,234,0.5); }
+        .btn-secondary:hover { box-shadow: 0 10px 25px -3px rgba(102,126,234,0.6); transform: translateY(-2px); }
+        .btn-clear { padding: 0.5rem 1rem; font-size: 0.875rem; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; font-weight: 600; border-radius: 0.75rem; transition: all 0.2s ease; cursor: pointer; }
+        .btn-clear:hover { background: #e5e7eb; transform: translateY(-1px); }
+        .tab-btn { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.8rem; padding: 0.5rem 1.1rem; border-radius: 0.6rem; border: none; cursor: pointer; color: #6b7280; background: transparent; transition: all 0.2s; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 4px 12px -2px rgba(102,126,234,0.4); }
+        .tab-btn:hover:not(.active) { background: #f3f4f6; color: #374151; }
+        .stat-card { background: white; border-radius: 1rem; padding: 1.2rem 1.4rem; box-shadow: 0 4px 12px rgba(0,0,0,0.06); transition: box-shadow 0.2s; }
+        .stat-card:hover { box-shadow: 0 8px 24px rgba(102,126,234,0.15); }
+        .stat-num { font-size: 2rem; font-weight: 800; line-height: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-num.green { background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; background-clip: text; }
+        .stat-num.pink { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; background-clip: text; }
+        .photo-thumb { aspect-ratio: 1; object-fit: cover; border-radius: 0.75rem; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; width: 100%; }
+        .photo-thumb:hover { transform: scale(1.04); box-shadow: 0 8px 24px rgba(102,126,234,0.2); }
+        .gps-badge { position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; }
+        .gps-yes { background: #10b981; }
+        .gps-no  { background: #ef4444; }
+        .camera-group-header { cursor: pointer; padding: 0.9rem 1.2rem; border-radius: 0.75rem; background: #f9fafb; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s; user-select: none; }
+        .camera-group-header:hover { background: #f3f4f6; }
+        .camera-group-body { display: none; }
+        .camera-group-body.open { display: block; }
+        .chevron { transition: transform 0.25s; }
+        .chevron.open { transform: rotate(180deg); }
+        #mapLeaflet { height: 460px; border-radius: 1rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .tl-bar { background: linear-gradient(to top, #667eea, #764ba2); border-radius: 3px 3px 0 0; min-width: 3px; transition: opacity 0.2s; cursor: pointer; position: relative; }
+        .tl-bar:hover { opacity: 0.75; }
+        .tl-bar::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1f2937; color: white; font-size: 0.68rem; white-space: nowrap; padding: 3px 8px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .tl-bar:hover::after { opacity: 1; }
+        .filter-btn { font-size: 0.78rem; font-weight: 600; padding: 0.38rem 0.9rem; border-radius: 99px; border: 1.5px solid #e5e7eb; background: white; cursor: pointer; color: #6b7280; transition: all 0.15s; }
+        .filter-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-color: transparent; box-shadow: 0 2px 10px -1px rgba(102,126,234,0.4); }
+        .filter-btn:hover:not(.active) { border-color: #9ca3af; color: #374151; }
+
+        /* ---- MODAL ---- */
+        #detailModal { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); align-items: center; justify-content: center; }
+        #detailModal.open { display: flex; }
+        #detailModal .inner { background: white; border-radius: 1.5rem; max-width: 900px; width: 95vw; max-height: 92vh; overflow-y: auto; padding: 2rem; box-shadow: 0 25px 50px rgba(0,0,0,0.25); }
+
+        /* ---- METADATA SECTIONS ---- */
+        .meta-section { margin-bottom: 1.2rem; }
+        .meta-section-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+            padding: 0.5rem 0 0.4rem;
+            border-bottom: 1px solid #f3f4f6;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 5px 6px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            gap: 12px;
+            transition: background 0.15s;
+        }
+        .meta-row:hover { background: #f9fafb; }
+        .meta-key { color: #9ca3af; flex-shrink: 0; min-width: 110px; }
+        .meta-val { font-weight: 500; text-align: right; word-break: break-all; color: #1f2937; }
+        .meta-val.highlight { color: #667eea; font-weight: 600; }
+        .meta-val.coords { font-family: monospace; font-size: 0.78rem; color: #059669; }
+
+        /* Copy coords button */
+        .copy-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.7rem; font-weight: 600; padding: 2px 8px;
+            background: #f3f4f6; border: 1px solid #e5e7eb;
+            border-radius: 6px; cursor: pointer; color: #6b7280;
+            transition: all 0.15s; margin-left: 6px;
+        }
+        .copy-btn:hover { background: #e5e7eb; color: #374151; }
+
+        .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; }
+        .pill-green { background: #d1fae5; color: #065f46; }
+        .pill-red   { background: #fee2e2; color: #991b1b; }
+        .pill-purple { background: #ede9fe; color: #5b21b6; }
+        .pill-pink  { background: #fce7f3; color: #9d174d; }
+        .pill-blue  { background: #dbeafe; color: #1e40af; }
+        .pill-orange { background: #ffedd5; color: #9a3412; }
+        .trip-segment { border-left: 3px solid #667eea; padding-left: 1rem; margin-bottom: 0.5rem; }
+        #dashPage { background: #f9fafb; min-height: 100vh; }
+        #dashHeader { background: white; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 100; }
+        .hero-icon { width: 60px; height: 60px; margin: 0 auto 1.5rem; }
+        .route-line { stroke-dasharray: 8 5; animation: dashMove 1s linear infinite; }
+        @keyframes dashMove { to { stroke-dashoffset: -13; } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+        /* Modal tabs */
+        .modal-tab-btn { font-size: 0.75rem; font-weight: 600; padding: 0.35rem 0.85rem; border-radius: 0.5rem; border: none; cursor: pointer; color: #6b7280; background: transparent; transition: all 0.2s; }
+        .modal-tab-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .modal-tab-btn:hover:not(.active) { background: #f3f4f6; }
+        .modal-tab-panel { display: none; }
+        .modal-tab-panel.active { display: block; }
+
+        /* Raw EXIF table */
+        .raw-exif-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+        .raw-exif-table tr:nth-child(even) { background: #f9fafb; }
+        .raw-exif-table td { padding: 4px 8px; border-bottom: 1px solid #f3f4f6; }
+        .raw-exif-table td:first-child { color: #9ca3af; width: 45%; }
+        .raw-exif-table td:last-child { font-weight: 500; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+<!-- ===================== UPLOAD PAGE ===================== -->
+<div id="uploadPage" class="min-h-screen gradient-bg flex flex-col items-center justify-center p-4">
+    <main class="w-full max-w-xl mx-auto text-center">
+        <svg class="hero-icon text-white pulse-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <h1 class="text-4xl md:text-5xl font-bold mb-3 text-white">
+        MetaPeek Advanced
+        </h1>
+        <p class="text-lg md:text-xl text-indigo-100 mb-8">
+                Batch-drop your photos to reveal GPS maps, camera stats, timelines, and hidden EXIF layers — the big-dog upgrade your images deserve.
+        </p>
+
+        <div id="dropZone" class="upload-card relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 md:p-12 border-2 border-dashed border-white/30 transition-all duration-300 ease-in-out">
+            <div class="flex flex-col items-center justify-center space-y-4">
+                <svg class="w-16 h-16 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <button onclick="document.getElementById('fileInput').click()" class="btn btn-primary text-lg py-3 px-8 shadow-xl">
+                    Select Images
+                </button>
+                <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
+                <p class="text-white/70 text-sm">or drag and drop — select multiple for batch analysis</p>
+            </div>
+        </div>
+
+        <p class="text-white/80 text-sm mt-8">
+            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6.364-8.364l-1.414 1.414M21 12h-2M4 12H2m15.636-6.364l-1.414-1.414M12 3v2M6.364 6.364L7.778 7.778m12.727 0l-1.414-1.414M4 12a8 8 0 018-8" />
+            </svg>
+            <strong>100% Private:</strong> Your images are processed in your browser and never uploaded.
+        </p>
+    </main>
+</div>
+
+<!-- ===================== DASHBOARD ===================== -->
+<div id="dashPage" class="hidden min-h-screen">
+    <header id="dashHeader">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+            <div class="flex items-center gap-3">
+                <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="text-xl font-bold text-gray-800">MetaPeek</span>
+                <span id="headerPhotoCount" class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 rounded-full px-3 py-0.5">0 photos</span>
+            </div>
+            <div class="flex gap-2 items-center">
+                <button class="btn btn-secondary text-sm" onclick="document.getElementById('fileInputMore').click()" style="padding:0.5rem 1.1rem;font-size:0.82rem;">+ Add more</button>
+                <input type="file" id="fileInputMore" accept="image/*" multiple class="hidden">
+                <button class="btn-clear" onclick="resetAll()">Clear all</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <div id="insightsBar" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8 fade-in">
+            <div class="stat-card"><div class="stat-num" id="si-total">0</div><div class="text-xs text-gray-500 mt-1">Total Photos</div></div>
+            <div class="stat-card"><div class="stat-num green" id="si-gps">0%</div><div class="text-xs text-gray-500 mt-1">GPS Coverage</div></div>
+            <div class="stat-card"><div class="stat-num" id="si-cameras">0</div><div class="text-xs text-gray-500 mt-1">Unique Cameras</div></div>
+            <div class="stat-card"><div class="stat-num" id="si-daterange" style="font-size:1.1rem;-webkit-text-fill-color:initial;background:none;color:#374151;">—</div><div class="text-xs text-gray-500 mt-1">Date Range</div></div>
+            <div class="stat-card"><div class="stat-num pink" id="si-locations">0</div><div class="text-xs text-gray-500 mt-1">GPS Locations</div></div>
+            <div class="stat-card"><div class="stat-num" id="si-trips">0</div><div class="text-xs text-gray-500 mt-1">Trip Segments</div></div>
+        </div>
+
+        <div class="flex gap-2 flex-wrap mb-8 bg-white rounded-2xl p-2 card-shadow w-fit">
+            <button class="tab-btn active" data-tab="photos">Photos</button>
+            <button class="tab-btn" data-tab="cameras">By Camera</button>
+            <button class="tab-btn" data-tab="map">Map &amp; Travel</button>
+            <button class="tab-btn" data-tab="timeline">Timeline</button>
+        </div>
+
+        <!-- TAB: PHOTOS -->
+        <div id="tab-photos" class="tab-panel">
+            <div class="flex gap-2 flex-wrap items-center mb-6">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Filter:</span>
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="gps">With GPS</button>
+                <button class="filter-btn" data-filter="nogps">No GPS</button>
+                <div class="ml-auto flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Sort:</span>
+                    <select id="sortSelect" class="text-sm px-2 py-1 border border-gray-200 rounded-lg bg-white cursor-pointer font-medium text-gray-700">
+                        <option value="name">Name</option>
+                        <option value="date">Date taken</option>
+                        <option value="camera">Camera</option>
+                    </select>
+                </div>
+            </div>
+            <div id="photoGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3"></div>
+            <p id="emptyGridMsg" class="hidden text-center py-12 text-gray-400">No photos match this filter.</p>
+        </div>
+
+        <!-- TAB: CAMERAS -->
+        <div id="tab-cameras" class="tab-panel hidden">
+            <div id="cameraGroups" class="space-y-3"></div>
+        </div>
+
+        <!-- TAB: MAP -->
+        <div id="tab-map" class="tab-panel hidden">
+            <div class="flex gap-2 flex-wrap items-center mb-4">
+                <button class="filter-btn active" id="mapModeMarkers" onclick="switchMapMode('markers')">📍 Markers</button>
+                <button class="filter-btn" id="mapModeHeat" onclick="switchMapMode('heat')">🔥 Heatmap</button>
+                <button class="filter-btn" id="mapModeRoute" onclick="switchMapMode('route')">🛣️ Travel Route</button>
+                <button class="btn-clear ml-auto" onclick="fitMapToBounds()">Fit to photos</button>
+            </div>
+            <div id="mapLeaflet"></div>
+            <div id="tripSegmentsBox" class="mt-6 hidden">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">Trip Segments Detected</h3>
+                <div id="tripSegmentsList" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- TAB: TIMELINE -->
+        <div id="tab-timeline" class="tab-panel hidden">
+            <div class="flex gap-2 flex-wrap mb-6 items-center">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Group by:</span>
+                <button class="filter-btn active" data-tlgroup="day" onclick="renderTimeline('day', this)">Day</button>
+                <button class="filter-btn" data-tlgroup="month" onclick="renderTimeline('month', this)">Month</button>
+                <button class="filter-btn" data-tlgroup="year" onclick="renderTimeline('year', this)">Year</button>
+            </div>
+            <div class="bg-white rounded-2xl card-shadow p-6 mb-6">
+                <div id="timelineChart" style="display:flex;align-items:flex-end;gap:3px;height:200px;overflow-x:auto;padding:0 4px;"></div>
+                <div id="timelineLabels" style="display:flex;gap:3px;overflow-x:auto;padding:6px 4px 0;"></div>
+            </div>
+            <div id="timelineSessionsBox">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Shooting Sessions</h3>
+                <div id="timelineSessions" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== DETAIL MODAL ===================== -->
+<div id="detailModal">
+    <div class="inner">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+            <div>
+                <div id="modalFileName" style="font-size:1.15rem;font-weight:700;color:#111827;"></div>
+                <div id="modalPills" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
+            </div>
+            <button onclick="closeModal()" style="background:#f3f4f6;border:none;border-radius:8px;width:36px;height:36px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+        </div>
+
+        <!-- Modal tabs -->
+        <div style="display:flex;gap:4px;background:#f9fafb;border-radius:10px;padding:4px;width:fit-content;margin-bottom:1.25rem;">
+            <button class="modal-tab-btn active" onclick="switchModalTab('details', this)">📋 Details</button>
+            <button class="modal-tab-btn" onclick="switchModalTab('raw', this)">🔧 Raw EXIF</button>
+        </div>
+
+        <!-- DETAILS TAB -->
+        <div id="modalTabDetails" class="modal-tab-panel active">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;" class="modal-grid">
+                <!-- Left: image -->
+                <div>
+                    <img id="modalImg" src="" alt="" style="width:100%;border-radius:12px;object-fit:contain;max-height:320px;background:#f9fafb;">
+                    <!-- GPS map -->
+                    <div id="modalMapBox" class="mt-4 hidden">
+                        <div style="font-weight:700;font-size:0.82rem;color:#374151;margin-bottom:6px;">📍 Location</div>
+                        <div id="modalMap" style="height:180px;border-radius:0.75rem;border:1px solid #e5e7eb;overflow:hidden;"></div>
+                        <div id="modalCoordsDisplay" style="font-size:0.72rem;color:#6b7280;margin-top:6px;text-align:center;"></div>
+                    </div>
+                </div>
+
+                <!-- Right: metadata -->
+                <div id="modalMeta" style="overflow-y:auto;max-height:520px;"></div>
+            </div>
+        </div>
+
+        <!-- RAW EXIF TAB -->
+        <div id="modalTabRaw" class="modal-tab-panel">
+            <div style="background:#f9fafb;border-radius:10px;padding:1rem;max-height:500px;overflow-y:auto;">
+                <table class="raw-exif-table" id="rawExifTable">
+                    <tbody id="rawExifBody"></tbody>
+                </table>
+                <p id="rawExifEmpty" class="text-gray-400 text-sm text-center py-8 hidden">No raw EXIF data available.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media (max-width: 640px) {
+    .modal-grid { grid-template-columns: 1fr !important; }
+}
+</style>
+
+<script>
+let photos = [];
+let leafletMap = null;
+let markersLayer = null;
+let heatLayer = null;
+let routeLayer = null;
+let modalMap = null;
+let currentMapMode = 'markers';
+let currentFilter = 'all';
+let currentSort = 'name';
+
+document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
+document.getElementById('fileInputMore').addEventListener('change', e => handleFiles(e.target.files));
+
+const dropZone = document.getElementById('dropZone');
+['dragenter','dragover','dragleave','drop'].forEach(ev => {
+    dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+    document.body.addEventListener(ev, e => e.preventDefault());
+});
+dropZone.addEventListener('dragenter', () => dropZone.classList.add('dragover'));
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+
+async function handleFiles(fileList) {
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    document.getElementById('uploadPage').classList.add('hidden');
+    document.getElementById('dashPage').classList.remove('hidden');
+    const results = await Promise.all(files.map(parsePhoto));
+    const newPhotos = results.filter(Boolean);
+    photos = deduplicatePhotos([...photos, ...newPhotos]);
+    updateDashboard();
+}
+
+function deduplicatePhotos(arr) {
+    const seen = new Set();
+    return arr.filter(p => {
+        if (seen.has(p.name + p.file.size)) return false;
+        seen.add(p.name + p.file.size);
+        return true;
+    });
+}
+
+async function parsePhoto(file) {
+    try {
+        const [tags, dataUrl] = await Promise.all([
+            exifr.parse(file, {
+                // Enable every known segment
+                tiff: true,
+                exif: true,
+                gps: true,
+                iptc: true,
+                ifd0: true,
+                ifd1: true,
+                interop: true,
+                // Don't sanitize — give us raw keys too
+                sanitize: false,
+                reviveValues: true,
+                translateKeys: true,
+                translateValues: true,
+                mergeOutput: true,
+            }),
+            readFileAsDataURL(file)
+        ]);
+
+        // exifr sometimes returns null for files with no EXIF at all
+        const t = tags || {};
+
+        // GPS coords — exifr puts these as .latitude/.longitude after parsing
+        const lat = t.latitude ?? t.GPSLatitude;
+        const lon = t.longitude ?? t.GPSLongitude;
+
+        // Manual GPS conversion if exifr gave us raw DMS arrays
+        let resolvedLat = (typeof lat === 'number') ? lat : parseDMS(lat, t.GPSLatitudeRef);
+        let resolvedLon = (typeof lon === 'number') ? lon : parseDMS(lon, t.GPSLongitudeRef);
+
+        const hasGps = typeof resolvedLat === 'number' && !isNaN(resolvedLat)
+                    && typeof resolvedLon === 'number' && !isNaN(resolvedLon);
+
+        // Normalize date
+        let dateRaw = t.DateTimeOriginal || t.DateTime || t.DateTimeDigitized || null;
+        let date = null;
+        if (dateRaw) {
+            if (dateRaw instanceof Date) {
+                date = dateRaw;
+            } else if (typeof dateRaw === 'string') {
+                dateRaw = dateRaw.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
+                date = new Date(dateRaw);
+            }
+            if (date && isNaN(date.getTime())) date = null;
+        }
+
+        const make  = (t.Make  || '').trim();
+        const model = (t.Model || '').trim();
+        // Avoid "Apple Apple iPhone 13" style duplicates
+        const camera = make && model
+            ? (model.toLowerCase().startsWith(make.toLowerCase()) ? model : `${make} ${model}`)
+            : (make || model || 'Unknown Camera');
+
+        // Store both the merged flat object AND keep lat/lon resolved
+        if (hasGps) { t.latitude = resolvedLat; t.longitude = resolvedLon; }
+
+        return { file, dataUrl, tags: t, name: file.name, date, camera,
+                 lat: resolvedLat, lon: resolvedLon, hasGps };
+
+    } catch (err) {
+        console.warn('Could not parse', file.name, err);
+        // Return photo with no metadata rather than dropping it entirely
+        const dataUrl = await readFileAsDataURL(file).catch(() => '');
+        return { file, dataUrl, tags: {}, name: file.name, date: null,
+                 camera: 'Unknown Camera', lat: null, lon: null, hasGps: false };
+    }
+}
+
+// Convert DMS array [deg, min, sec] + ref ('N'/'S'/'E'/'W') to decimal degrees
+function parseDMS(dms, ref) {
+    if (!Array.isArray(dms) || dms.length < 3) return null;
+    const decimal = dms[0] + dms[1] / 60 + dms[2] / 3600;
+    return (ref === 'S' || ref === 'W') ? -decimal : decimal;
+}
+
+function readFileAsDataURL(file) {
+    return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = e => res(e.target.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+    });
+}
+
+function updateDashboard() {
+    updateInsights();
+    renderPhotoGrid();
+    renderCameraGroups();
+    renderTimeline('day');
+    initOrUpdateMap();
+    document.getElementById('headerPhotoCount').textContent = `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+}
+
+function updateInsights() {
+    const total = photos.length;
+    const withGps = photos.filter(p => p.hasGps);
+    const gpsPct = total ? Math.round((withGps.length / total) * 100) : 0;
+    const cameras = new Set(photos.map(p => p.camera));
+    const datesValid = photos.filter(p => p.date).map(p => p.date);
+
+    let dateRangeStr = '—';
+    if (datesValid.length >= 2) {
+        datesValid.sort((a, b) => a - b);
+        const fmt = d => d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        dateRangeStr = `${fmt(datesValid[0])}–${fmt(datesValid[datesValid.length-1])}`;
+    } else if (datesValid.length === 1) {
+        dateRangeStr = datesValid[0].toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    const trips = detectTripSegments(withGps);
+    document.getElementById('si-total').textContent = total;
+    document.getElementById('si-gps').textContent = `${gpsPct}%`;
+    document.getElementById('si-cameras').textContent = cameras.size;
+    document.getElementById('si-daterange').style.fontSize = datesValid.length ? '1rem' : '2rem';
+    document.getElementById('si-daterange').textContent = dateRangeStr;
+    document.getElementById('si-locations').textContent = withGps.length;
+    document.getElementById('si-trips').textContent = trips.length;
+}
+
+function renderPhotoGrid() {
+    const grid = document.getElementById('photoGrid');
+    grid.innerHTML = '';
+    let filtered = getFilteredSorted();
+    document.getElementById('emptyGridMsg').classList.toggle('hidden', filtered.length > 0);
+    filtered.forEach(p => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;';
+        const img = document.createElement('img');
+        img.src = p.dataUrl;
+        img.alt = p.name;
+        img.className = 'photo-thumb w-full fade-in';
+        img.title = p.name;
+        img.onclick = () => openModal(p);
+        const badge = document.createElement('div');
+        badge.className = `gps-badge ${p.hasGps ? 'gps-yes' : 'gps-no'}`;
+        wrap.appendChild(img);
+        wrap.appendChild(badge);
+        grid.appendChild(wrap);
+    });
+}
+
+function getFilteredSorted() {
+    let filtered = [...photos];
+    if (currentFilter === 'gps') filtered = filtered.filter(p => p.hasGps);
+    else if (currentFilter === 'nogps') filtered = filtered.filter(p => !p.hasGps);
+    if (currentSort === 'date') filtered.sort((a, b) => (a.date || 0) - (b.date || 0));
+    else if (currentSort === 'camera') filtered.sort((a, b) => a.camera.localeCompare(b.camera));
+    else filtered.sort((a, b) => a.name.localeCompare(b.name));
+    return filtered;
+}
+
+document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderPhotoGrid();
+    });
+});
+
+document.getElementById('sortSelect').addEventListener('change', e => {
+    currentSort = e.target.value;
+    renderPhotoGrid();
+});
+
+function renderCameraGroups() {
+    const container = document.getElementById('cameraGroups');
+    container.innerHTML = '';
+    const grouped = {};
+    photos.forEach(p => { if (!grouped[p.camera]) grouped[p.camera] = []; grouped[p.camera].push(p); });
+
+    Object.entries(grouped).sort((a, b) => b[1].length - a[1].length).forEach(([camera, cPhotos]) => {
+        const gpsCount = cPhotos.filter(p => p.hasGps).length;
+        const group = document.createElement('div');
+        group.style.cssText = 'border:1px solid #e5e7eb;border-radius:1rem;overflow:hidden;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.05);';
+        const header = document.createElement('div');
+        header.className = 'camera-group-header';
+        header.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span class="inline-flex items-center bg-purple-50 px-3 py-1 rounded-full">
+                    <svg class="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <span class="font-semibold text-gray-800 text-sm">${camera}</span>
+                </span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="pill pill-purple">${cPhotos.length} photo${cPhotos.length !== 1 ? 's' : ''}</span>
+                ${gpsCount > 0 ? `<span class="pill pill-green">📍 ${gpsCount} GPS</span>` : ''}
+                <svg class="chevron w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </div>`;
+        const body = document.createElement('div');
+        body.className = 'camera-group-body';
+        body.style.cssText = 'padding:1rem;background:#f9fafb;border-top:1px solid #e5e7eb;';
+        const miniGrid = document.createElement('div');
+        miniGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;';
+        cPhotos.forEach(p => {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative;';
+            const img = document.createElement('img');
+            img.src = p.dataUrl;
+            img.className = 'photo-thumb w-full';
+            img.style.cssText = 'border-radius:8px;';
+            img.onclick = () => openModal(p);
+            const badge = document.createElement('div');
+            badge.className = `gps-badge ${p.hasGps ? 'gps-yes' : 'gps-no'}`;
+            wrap.appendChild(img); wrap.appendChild(badge); miniGrid.appendChild(wrap);
+        });
+        body.appendChild(miniGrid);
+        header.onclick = () => { const open = body.classList.toggle('open'); header.querySelector('.chevron').classList.toggle('open', open); };
+        group.appendChild(header); group.appendChild(body); container.appendChild(group);
+    });
+}
+
+// MAP
+function initOrUpdateMap() {
+    const gpsPhotos = photos.filter(p => p.hasGps);
+    if (!leafletMap) {
+        leafletMap = L.map('mapLeaflet').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(leafletMap);
+    }
+    clearMapLayers();
+    if (gpsPhotos.length === 0) return;
+    applyMapMode(currentMapMode, gpsPhotos);
+    renderTripSegments(gpsPhotos);
+    setTimeout(() => fitMapToBounds(), 100);
+}
+
+function clearMapLayers() {
+    if (markersLayer) { markersLayer.clearLayers(); leafletMap.removeLayer(markersLayer); markersLayer = null; }
+    if (heatLayer) { leafletMap.removeLayer(heatLayer); heatLayer = null; }
+    if (routeLayer) { leafletMap.removeLayer(routeLayer); routeLayer = null; }
+}
+
+function applyMapMode(mode, gpsPhotos) {
+    if (!gpsPhotos) gpsPhotos = photos.filter(p => p.hasGps);
+    clearMapLayers(); currentMapMode = mode;
+    if (mode === 'markers' || mode === 'route') {
+        markersLayer = L.markerClusterGroup({ disableClusteringAtZoom: 14 });
+        gpsPhotos.forEach(p => {
+            const icon = L.divIcon({ className: '', html: `<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:linear-gradient(135deg,#f093fb,#f5576c);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);overflow:hidden;"><img src="${p.dataUrl}" style="width:100%;height:100%;object-fit:cover;transform:rotate(45deg) scale(1.4);" /></div>`, iconSize: [38,38], iconAnchor: [19,38] });
+            const marker = L.marker([p.lat, p.lon], { icon });
+            const dateStr = p.date ? p.date.toLocaleDateString('en-US', { dateStyle: 'medium' }) : 'Unknown date';
+            marker.bindPopup(`<div style="font-family:'Inter',sans-serif;min-width:180px;"><img src="${p.dataUrl}" style="width:100%;border-radius:8px;margin-bottom:8px;max-height:120px;object-fit:cover;"><div style="font-weight:700;font-size:0.85rem;margin-bottom:2px;">${p.name}</div><div style="font-size:0.78rem;color:#6b7280;">${p.camera}</div><div style="font-size:0.78rem;color:#6b7280;">📅 ${dateStr}</div><div style="font-size:0.72rem;color:#9ca3af;margin-top:4px;">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</div></div>`);
+            markersLayer.addLayer(marker);
+        });
+        markersLayer.addTo(leafletMap);
+        if (mode === 'route') {
+            const sorted = [...gpsPhotos].sort((a, b) => (a.date || 0) - (b.date || 0));
+            const coords = sorted.map(p => [p.lat, p.lon]);
+            if (coords.length > 1) {
+                routeLayer = L.polyline(coords, { color: '#667eea', weight: 3, opacity: 0.8, className: 'route-line' }).addTo(leafletMap);
+                addRouteArrows(coords);
+            }
+        }
+    } else if (mode === 'heat') {
+        const heatData = gpsPhotos.map(p => [p.lat, p.lon, 1]);
+        heatLayer = L.heatLayer(heatData, { radius: 35, blur: 20, maxZoom: 17, gradient: { 0.1: '#2a6ef5', 0.4: '#764ba2', 0.7: '#f5576c', 1.0: '#e8521a' } }).addTo(leafletMap);
+    }
+}
+
+function addRouteArrows(coords) {
+    for (let i = 0; i < coords.length - 1; i++) {
+        const mid = [(coords[i][0] + coords[i+1][0]) / 2, (coords[i][1] + coords[i+1][1]) / 2];
+        const arrow = L.divIcon({ className: '', html: `<div style="width:10px;height:10px;background:#667eea;border-radius:50%;border:2px solid white;"></div>`, iconSize: [10,10], iconAnchor: [5,5] });
+        L.marker(mid, { icon: arrow, interactive: false }).addTo(leafletMap);
+    }
+}
+
+function switchMapMode(mode) {
+    ['markers','heat','route'].forEach(m => {
+        document.getElementById(`mapMode${m.charAt(0).toUpperCase() + m.slice(1)}`).classList.toggle('active', m === mode);
+    });
+    applyMapMode(mode);
+}
+
+function fitMapToBounds() {
+    const gpsPhotos = photos.filter(p => p.hasGps);
+    if (!gpsPhotos.length || !leafletMap) return;
+    const bounds = L.latLngBounds(gpsPhotos.map(p => [p.lat, p.lon]));
+    leafletMap.fitBounds(bounds, { padding: [40, 40] });
+}
+
+function detectTripSegments(gpsPhotos) {
+    if (!gpsPhotos || gpsPhotos.length < 2) return gpsPhotos ? [gpsPhotos] : [];
+    const sorted = [...gpsPhotos].filter(p => p.date).sort((a, b) => a.date - b.date);
+    if (!sorted.length) return [gpsPhotos];
+    const GAP_HOURS = 24;
+    const segments = [];
+    let current = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+        const diffH = (sorted[i].date - sorted[i-1].date) / (1000 * 3600);
+        if (diffH > GAP_HOURS) { segments.push(current); current = [sorted[i]]; }
+        else current.push(sorted[i]);
+    }
+    segments.push(current);
+    const undated = gpsPhotos.filter(p => !p.date);
+    if (undated.length) segments.push(undated);
+    return segments.filter(s => s.length > 0);
+}
+
+function renderTripSegments(gpsPhotos) {
+    const segments = detectTripSegments(gpsPhotos);
+    const box = document.getElementById('tripSegmentsBox');
+    const list = document.getElementById('tripSegmentsList');
+    list.innerHTML = '';
+    if (segments.length <= 1) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    segments.forEach((seg, i) => {
+        const datesInSeg = seg.filter(p => p.date);
+        let range = 'Unknown date';
+        if (datesInSeg.length) {
+            datesInSeg.sort((a,b) => a.date - b.date);
+            const fmt = d => d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+            range = datesInSeg.length > 1 ? `${fmt(datesInSeg[0].date)} → ${fmt(datesInSeg[datesInSeg.length-1].date)}` : fmt(datesInSeg[0].date);
+        }
+        const div = document.createElement('div');
+        div.className = 'trip-segment fade-in';
+        div.innerHTML = `<div class="flex items-center justify-between flex-wrap gap-2"><div><span class="font-bold text-gray-800 text-sm">Trip ${i+1}</span><div class="text-xs text-gray-500 mt-1">${range}</div></div><span class="pill pill-purple">${seg.length} location${seg.length !== 1 ? 's' : ''}</span></div>`;
+        list.appendChild(div);
+    });
+}
+
+function renderTimeline(groupBy, clickedBtn) {
+    if (clickedBtn) {
+        document.querySelectorAll('[data-tlgroup]').forEach(b => b.classList.remove('active'));
+        clickedBtn.classList.add('active');
+    }
+    const chart = document.getElementById('timelineChart');
+    const labels = document.getElementById('timelineLabels');
+    chart.innerHTML = ''; labels.innerHTML = '';
+    const datedPhotos = photos.filter(p => p.date);
+    if (!datedPhotos.length) { chart.innerHTML = '<p style="color:#9ca3af;font-size:0.9rem;padding:1rem;">No date information available.</p>'; return; }
+    const grouped = {};
+    datedPhotos.forEach(p => {
+        let key;
+        if (groupBy === 'year') key = p.date.getFullYear().toString();
+        else if (groupBy === 'month') key = `${p.date.getFullYear()}-${String(p.date.getMonth()+1).padStart(2,'0')}`;
+        else key = `${p.date.getFullYear()}-${String(p.date.getMonth()+1).padStart(2,'0')}-${String(p.date.getDate()).padStart(2,'0')}`;
+        grouped[key] = (grouped[key] || 0) + 1;
+    });
+    const sortedKeys = Object.keys(grouped).sort();
+    const maxVal = Math.max(...Object.values(grouped));
+    const chartHeight = 180;
+    const BAR_W = groupBy === 'day' ? 18 : groupBy === 'month' ? 28 : 50;
+    sortedKeys.forEach(key => {
+        const count = grouped[key];
+        const barH = Math.max(4, Math.round((count / maxVal) * chartHeight));
+        const bar = document.createElement('div');
+        bar.className = 'tl-bar';
+        bar.style.cssText = `height:${barH}px;width:${BAR_W}px;min-width:${BAR_W}px;`;
+        bar.setAttribute('data-tip', `${key}: ${count}`);
+        chart.appendChild(bar);
+        const lbl = document.createElement('div');
+        lbl.style.cssText = `width:${BAR_W}px;min-width:${BAR_W}px;font-size:0.65rem;color:#9ca3af;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+        const shortKey = groupBy === 'day' ? key.slice(5) : groupBy === 'month' ? key.slice(0,7).replace('-','/') : key;
+        lbl.textContent = shortKey;
+        labels.appendChild(lbl);
+    });
+    renderShootingSessions(datedPhotos);
+}
+
+function renderShootingSessions(datedPhotos) {
+    const sessions = document.getElementById('timelineSessions');
+    sessions.innerHTML = '';
+    if (!datedPhotos.length) return;
+    const sorted = [...datedPhotos].sort((a,b) => a.date - b.date);
+    const sessionList = [];
+    let current = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+        const diffH = (sorted[i].date - sorted[i-1].date) / (1000 * 3600);
+        if (diffH > 3) { sessionList.push(current); current = [sorted[i]]; }
+        else current.push(sorted[i]);
+    }
+    sessionList.push(current);
+    sessionList.slice(0, 20).forEach((sess, i) => {
+        const start = sess[0].date;
+        const end = sess[sess.length-1].date;
+        const cams = [...new Set(sess.map(p => p.camera))];
+        const gpsCount = sess.filter(p => p.hasGps).length;
+        const fmt = d => d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        const div = document.createElement('div');
+        div.style.cssText = 'background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.9rem 1.2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,0.04);';
+        div.innerHTML = `<div><div style="font-weight:700;font-size:0.88rem;">Session ${i+1}</div><div style="font-size:0.8rem;color:#9ca3af;margin-top:2px;">${fmt(start)}${sess.length > 1 ? ' → ' + fmt(end) : ''}</div><div style="font-size:0.78rem;color:#9ca3af;margin-top:2px;">${cams.join(', ')}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;"><span class="pill pill-purple">${sess.length} photo${sess.length!==1?'s':''}</span>${gpsCount ? `<span class="pill pill-green">📍 ${gpsCount}</span>` : ''}</div>`;
+        sessions.appendChild(div);
+    });
+    if (sessionList.length > 20) {
+        const more = document.createElement('p');
+        more.style.cssText = 'color:#9ca3af;font-size:0.82rem;text-align:center;padding:0.5rem;';
+        more.textContent = `+ ${sessionList.length - 20} more sessions`;
+        sessions.appendChild(more);
+    }
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+        if (btn.dataset.tab === 'map') setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 100);
+    });
+});
+
+// =====================================================================
+// MODAL — EXPANDED METADATA
+// =====================================================================
+
+function switchModalTab(tab, btn) {
+    document.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.modal-tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`modalTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+}
+
+function formatExposureTime(val) {
+    if (val === undefined || val === null) return null;
+    if (val === 0) return '0s';
+    if (val >= 1) return `${val}s`;
+    const denom = Math.round(1 / val);
+    return `1/${denom}s`;
+}
+
+function formatAperture(val) {
+    if (val === undefined || val === null) return null;
+    return `f/${parseFloat(val.toFixed(1))}`;
+}
+
+function formatFocalLength(val) {
+    if (val === undefined || val === null) return null;
+    return `${parseFloat(val.toFixed(1))} mm`;
+}
+
+function formatFlash(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    const fired = val & 0x1;
+    const mode  = (val >> 3) & 0x3;
+    const modeStr = ['', ', auto', ', on', ', off'][mode] || '';
+    return fired ? `Flash fired${modeStr}` : `No flash${modeStr}`;
+}
+
+function formatOrientation(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    const map = { 1:'Horizontal (normal)', 2:'Mirror horizontal', 3:'Rotate 180°',
+                  4:'Mirror vertical', 5:'Mirror horizontal + rotate 270°',
+                  6:'Rotate 90° CW', 7:'Mirror horizontal + rotate 90°', 8:'Rotate 270° CW' };
+    return map[val] || `Value: ${val}`;
+}
+
+function formatWhiteBalance(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    return val === 0 ? 'Auto' : val === 1 ? 'Manual' : String(val);
+}
+
+function formatMeteringMode(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    const map = { 0:'Unknown', 1:'Average', 2:'Center-weighted average',
+                  3:'Spot', 4:'Multi-spot', 5:'Pattern', 6:'Partial', 255:'Other' };
+    return map[val] || String(val);
+}
+
+function formatExposureMode(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    return ['Auto', 'Manual', 'Auto bracket'][val] ?? String(val);
+}
+
+function formatExposureProgram(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    const map = { 0:'Not defined', 1:'Manual', 2:'Normal program',
+                  3:'Aperture priority', 4:'Shutter priority',
+                  5:'Creative program', 6:'Action program', 7:'Portrait mode', 8:'Landscape mode' };
+    return map[val] || String(val);
+}
+
+function formatSceneCaptureType(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    return ['Standard', 'Landscape', 'Portrait', 'Night scene'][val] ?? String(val);
+}
+
+function formatColorSpace(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val;
+    if (val === 1) return 'sRGB';
+    if (val === 65535) return 'Uncalibrated';
+    return String(val);
+}
+
+function formatExposureBias(val) {
+    if (val === undefined || val === null) return null;
+    const rounded = parseFloat(val.toFixed(2));
+    return `${rounded > 0 ? '+' : ''}${rounded} EV`;
+}
+
+function formatDate(d) {
+    if (!d) return null;
+    return d.toLocaleString('en-US', {
+        weekday: 'short', year: 'numeric', month: 'short',
+        day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+}
+
+function formatGPSAlt(p) {
+    const t = p.tags;
+    if (!t.GPSAltitude && t.GPSAltitude !== 0) return null;
+    const ref = t.GPSAltitudeRef === 1 ? 'below sea level' : 'above sea level';
+    return `${t.GPSAltitude.toFixed(1)}m ${ref}`;
+}
+
+function formatGPSSpeed(p) {
+    const t = p.tags;
+    if (!t.GPSSpeed) return null;
+    const unit = t.GPSSpeedRef === 'K' ? 'km/h' : t.GPSSpeedRef === 'M' ? 'mph' : t.GPSSpeedRef === 'N' ? 'knots' : 'km/h';
+    return `${t.GPSSpeed} ${unit}`;
+}
+
+function formatGPSDirection(p) {
+    const t = p.tags;
+    if (!t.GPSImgDirection && t.GPSImgDirection !== 0) return null;
+    const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
+    const dir = dirs[Math.round(t.GPSImgDirection / 45)];
+    return `${t.GPSImgDirection.toFixed(1)}° ${dir}`;
+}
+
+function metaRow(key, val, cls) {
+    if (val === null || val === undefined || val === '') return '';
+    return `<div class="meta-row"><span class="meta-key">${key}</span><span class="meta-val${cls ? ' ' + cls : ''}">${val}</span></div>`;
+}
+
+function metaSectionTitle(icon, title) {
+    return `<div class="meta-section-title">${icon} ${title}</div>`;
+}
+
+function openModal(p) {
+    try {
+    const t = p.tags || {};
+    document.getElementById('modalImg').src = p.dataUrl;
+    document.getElementById('modalFileName').textContent = p.name;
+
+    // Pills
+    const pillsEl = document.getElementById('modalPills');
+    pillsEl.innerHTML = '';
+    pillsEl.innerHTML += p.hasGps ? `<span class="pill pill-green">📍 GPS</span>` : `<span class="pill pill-red">No GPS</span>`;
+    if (p.date) pillsEl.innerHTML += `<span class="pill pill-purple">📅 ${p.date.toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>`;
+    pillsEl.innerHTML += `<span class="pill pill-pink">📷 ${p.camera}</span>`;
+    if (t.FNumber) pillsEl.innerHTML += `<span class="pill pill-blue">${formatAperture(t.FNumber)}</span>`;
+    if (t.ISOSpeedRatings) pillsEl.innerHTML += `<span class="pill pill-orange">ISO ${t.ISOSpeedRatings}</span>`;
+    if (t.ExposureTime) pillsEl.innerHTML += `<span class="pill pill-purple">${formatExposureTime(t.ExposureTime)}</span>`;
+
+    // ---- BUILD METADATA SECTIONS ----
+    const meta = document.getElementById('modalMeta');
+    let html = '';
+
+    // FILE INFO
+    html += metaSectionTitle('📁', 'File');
+    html += metaRow('Filename', p.name);
+    html += metaRow('File size', p.file ? (p.file.size > 1024*1024 ? (p.file.size/1024/1024).toFixed(2) + ' MB' : (p.file.size/1024).toFixed(1) + ' KB') : null);
+    html += metaRow('File type', p.file ? p.file.type : null);
+
+    // CAMERA & DEVICE
+    html += metaSectionTitle('📷', 'Camera & Device');
+    html += metaRow('Make', t.Make);
+    html += metaRow('Model', t.Model);
+    html += metaRow('Lens Make', t.LensMake);
+    html += metaRow('Lens Model', t.LensModel || null);
+    html += metaRow('Software', t.Software ? t.Software.trim() : null);
+    html += metaRow('Artist', t.Artist);
+    html += metaRow('Copyright', t.Copyright);
+
+    // DATE & TIME
+    html += metaSectionTitle('🕐', 'Date & Time');
+    html += metaRow('Date Taken', formatDate(p.date));
+    if (t.DateTimeDigitized) {
+        let d = t.DateTimeDigitized instanceof Date ? t.DateTimeDigitized
+              : new Date(String(t.DateTimeDigitized).replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'));
+        if (!isNaN(d)) html += metaRow('Digitized', formatDate(d));
+    }
+    html += metaRow('Timezone Offset', t.OffsetTime || t.OffsetTimeOriginal || null);
+    html += metaRow('Sub-second', t.SubSecTimeOriginal || t.SubSecTime || null);
+
+    // EXPOSURE
+    html += metaSectionTitle('⚡', 'Exposure');
+    html += metaRow('Shutter Speed', formatExposureTime(t.ExposureTime));
+    html += metaRow('Aperture', formatAperture(t.FNumber));
+    html += metaRow('ISO', t.ISOSpeedRatings ?? t.ISO ?? null);
+    html += metaRow('Exposure Bias', formatExposureBias(t.ExposureBiasValue));
+    html += metaRow('Exposure Mode', formatExposureMode(t.ExposureMode));
+    html += metaRow('Exposure Program', formatExposureProgram(t.ExposureProgram));
+    html += metaRow('Metering Mode', formatMeteringMode(t.MeteringMode));
+    html += metaRow('Brightness', t.BrightnessValue !== undefined ? parseFloat(t.BrightnessValue.toFixed(2)) : null);
+
+    // OPTICS
+    html += metaSectionTitle('🔭', 'Optics');
+    html += metaRow('Focal Length', formatFocalLength(t.FocalLength));
+    html += metaRow('Focal Length (35mm)', t.FocalLengthIn35mmFormat ? `${Math.round(t.FocalLengthIn35mmFormat)} mm` : null);
+    html += metaRow('Max Aperture', t.MaxApertureValue ? formatAperture(Math.pow(2, t.MaxApertureValue / 2)) : null);
+    html += metaRow('Digital Zoom', t.DigitalZoomRatio !== undefined ? (t.DigitalZoomRatio === 0 || t.DigitalZoomRatio === 1 ? 'None' : `${parseFloat(t.DigitalZoomRatio.toFixed(2))}×`) : null);
+
+    // IMAGE
+    html += metaSectionTitle('🖼️', 'Image');
+    html += metaRow('Dimensions', (t.PixelXDimension && t.PixelYDimension) ? `${t.PixelXDimension} × ${t.PixelYDimension} px` : null);
+    html += metaRow('Orientation', formatOrientation(t.Orientation));
+    html += metaRow('Color Space', formatColorSpace(t.ColorSpace));
+    html += metaRow('White Balance', formatWhiteBalance(t.WhiteBalance));
+    html += metaRow('Scene Capture', formatSceneCaptureType(t.SceneCaptureType));
+    html += metaRow('Contrast', t.Contrast !== undefined ? (['Normal','Soft','Hard'][t.Contrast] ?? String(t.Contrast)) : null);
+    html += metaRow('Saturation', t.Saturation !== undefined ? (['Normal','Low saturation','High saturation'][t.Saturation] ?? String(t.Saturation)) : null);
+    html += metaRow('Sharpness', t.Sharpness !== undefined ? (['Normal','Soft','Hard'][t.Sharpness] ?? String(t.Sharpness)) : null);
+    html += metaRow('Resolution', (t.XResolution && t.YResolution) ? `${t.XResolution} × ${t.YResolution} ${t.ResolutionUnit === 3 ? 'ppcm' : 'dpi'}` : null);
+
+    // FLASH & LIGHT
+    html += metaSectionTitle('💡', 'Flash & Light');
+    html += metaRow('Flash', formatFlash(t.Flash));
+    html += metaRow('Flash Energy', t.FlashEnergy);
+    html += metaRow('Light Source', t.LightSource !== undefined ? (typeof t.LightSource === 'string' ? t.LightSource : (['Unknown','Daylight','Fluorescent','Tungsten','Flash','Fine weather','Cloudy','Shade'][t.LightSource] ?? String(t.LightSource))) : null);
+
+    // GPS
+    if (p.hasGps) {
+        html += metaSectionTitle('📍', 'GPS & Location');
+        html += metaRow('Latitude', p.lat.toFixed(7), 'coords');
+        html += metaRow('Longitude', p.lon.toFixed(7), 'coords');
+        html += metaRow('Altitude', formatGPSAlt(p));
+        html += metaRow('Speed', formatGPSSpeed(p));
+        html += metaRow('Direction', formatGPSDirection(p));
+        html += metaRow('GPS Date', t.GPSDateStamp);
+        html += metaRow('GPS Time', t.GPSTimeStamp ? t.GPSTimeStamp.join(':') : null);
+        const coordStr = `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
+        html += `<div class="meta-row" style="margin-top:4px;"><span class="meta-key">Copy coords</span><button class="copy-btn" onclick="copyCoords('${coordStr}', this)">📋 Copy</button></div>`;
+        html += `<div class="meta-row"><span class="meta-key">Google Maps</span><a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank" style="font-size:0.78rem;color:#667eea;font-weight:600;">Open ↗</a></div>`;
+    }
+
+    meta.innerHTML = html;
+
+    // GPS mini-map
+    const mapBox = document.getElementById('modalMapBox');
+    if (p.hasGps) {
+        mapBox.classList.remove('hidden');
+        document.getElementById('modalCoordsDisplay').textContent = `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
+        if (modalMap) { modalMap.remove(); modalMap = null; }
+        setTimeout(() => {
+            modalMap = L.map('modalMap').setView([p.lat, p.lon], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(modalMap);
+            L.marker([p.lat, p.lon]).addTo(modalMap);
+        }, 50);
+    } else {
+        mapBox.classList.add('hidden');
+    }
+
+    // ---- RAW EXIF TABLE ----
+    const tbody = document.getElementById('rawExifBody');
+    tbody.innerHTML = '';
+    const rawEmpty = document.getElementById('rawExifEmpty');
+
+    if (t && Object.keys(t).length > 0) {
+        rawEmpty.classList.add('hidden');
+        const skipKeys = ['latitude','longitude']; // already shown nicely
+        const sortedEntries = Object.entries(t).filter(([k]) => !skipKeys.includes(k)).sort((a,b) => a[0].localeCompare(b[0]));
+        sortedEntries.forEach(([key, val]) => {
+            let displayVal = val;
+            if (val instanceof Date) displayVal = val.toLocaleString();
+            else if (Array.isArray(val)) displayVal = val.join(', ');
+            else if (typeof val === 'object' && val !== null) displayVal = JSON.stringify(val);
+            else if (typeof val === 'number') displayVal = isNaN(val) ? '—' : String(val);
+            else displayVal = String(val);
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${key}</td><td>${displayVal}</td>`;
+            tbody.appendChild(tr);
+        });
+    } else {
+        rawEmpty.classList.remove('hidden');
+    }
+
+    // Switch to details tab by default
+    const firstModalTab = document.querySelector('.modal-tab-btn');
+    if (firstModalTab) switchModalTab('details', firstModalTab);
+    document.getElementById('detailModal').classList.add('open');
+
+    } catch(err) {
+        console.error('openModal error:', err);
+        // Still open modal even if metadata parsing fails
+        document.getElementById('detailModal').classList.add('open');
+    }
+}
+
+function copyCoords(coordStr, btn) {
+    navigator.clipboard.writeText(coordStr).then(() => {
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+    });
+}
+
+function closeModal() {
+    document.getElementById('detailModal').classList.remove('open');
+    document.getElementById('modalImg').src = '';
+    if (modalMap) { modalMap.remove(); modalMap = null; }
+}
+
+document.getElementById('detailModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('detailModal')) closeModal();
+});
+
+function resetAll() {
+    photos = [];
+    if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+    markersLayer = null; heatLayer = null; routeLayer = null;
+    currentFilter = 'all'; currentSort = 'name';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInputMore').value = '';
+    document.getElementById('dashPage').classList.add('hidden');
+    document.getElementById('uploadPage').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
