@@ -166,6 +166,7 @@
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <h1 class="text-4xl md:text-5xl font-bold mb-3 text-white">MetaPeek</h1>
+        
         <p class="text-lg md:text-xl text-indigo-100 mb-8">Instantly reveal hidden metadata from your photos.</p>
 
         <div id="uploadCard"
@@ -180,19 +181,30 @@
                     Select Image
                 </label>
 
+
                 <input type="file" id="imageInput" accept="image/*" class="hidden">
 
                 <p class="text-white/70 text-sm">or drag and drop here</p>
             </div>
         </div>
 
-        <p class="text-white/80 text-sm mt-8">
-            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 15v2m-6.364-8.364l-1.414 1.414M21 12h-2M4 12H2m15.636-6.364l-1.414-1.414M12 3v2M6.364 6.364L7.778 7.778m12.727 0l-1.414-1.414M4 12a8 8 0 018-8" />
-            </svg>
-            <strong>100% Private:</strong> Your images are processed in your browser and never uploaded.
-        </p>
+        <div class="flex items-center justify-between mt-8">
+    <p class="text-white/80 text-sm flex items-center">
+        <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 15v2m-6.364-8.364l-1.414 1.414M21 12h-2M4 12H2m15.636-6.364l-1.414-1.414M12 3v2M6.364 6.364L7.778 7.778m12.727 0l-1.414-1.414M4 12a8 8 0 018-8" />
+        </svg>
+        <strong class="ml-1">100% Private:</strong>
+        <span class="ml-1">Your images are processed in your browser and never uploaded.</span>
+    </p>
+
+    <a href="./MetaPeek_Osint.html"
+       class="ml-6 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 
+              text-white text-sm font-medium hover:bg-white/20 transition-all duration-300 
+              shadow-lg hover:shadow-xl">
+        OSINT
+    </a>
+</div>
     </main>
 
     <div id="resultsWrapper" class="max-w-5xl mx-auto w-full hidden">
