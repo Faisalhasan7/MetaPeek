@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; connect-src 'self' https://nominatim.openstreetmap.org; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>MetaPeek — See what your photos are hiding</title>
+  <meta name="description" content="Private, in-browser photo metadata analyzer. Reveal EXIF, GPS and device data, spot edits and inconsistencies, map and timeline whole photo sets, and strip metadata before you share.">
+  <meta name="theme-color" content="#5b5bf0">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/leaflet/MarkerCluster.css">
+  <link rel="stylesheet" href="vendor/leaflet/MarkerCluster.Default.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+  <div id="progress" class="hidden"><div class="bar"></div></div>
+  <div id="progressLabel" class="hidden"></div>
+
+  <!-- ============ LANDING ============ -->
+  <section id="landing">
+    <div class="landing-inner">
+      <div class="brand"><span class="brand-mark" data-icon="image"></span><span>MetaPeek</span></div>
+      <h1>Drop a photo. <span>See what it's hiding.</span></h1>
+      <p class="lead">Reveal GPS, device and timestamp metadata, spot signs of editing, map and timeline whole photo sets, then strip it all before you share. Nothing leaves your browser.</p>
+
+      <div id="dropZone">
+        <span data-icon="upload" data-cls="big"></span>
+        <div><strong>Drag photos or a whole folder here</strong></div>
+        <div class="drop-actions">
+          <button class="btn primary" id="pickFiles" type="button"><span data-icon="image"></span>Select photos</button>
+          <button class="btn" id="pickFolder" type="button"><span data-icon="folder"></span>Select folder</button>
+        </div>
+        <div class="hint">JPEG · PNG · HEIC · WebP · AVIF · TIFF · RAW (DNG, CR2, NEF, ARW) — or paste with Ctrl/⌘+V</div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*,.heic,.heif,.dng,.cr2,.cr3,.nef,.arw,.orf,.rw2,.raf,.tif,.tiff" multiple class="hidden">
+      <input type="file" id="folderInput" webkitdirectory multiple class="hidden">
+
+      <div class="features">
+        <div class="feature"><b>Privacy score</b>See exactly what a stranger learns from each file.</div>
+        <div class="feature"><b>One-click clean</b>Lossless metadata removal, single or batch ZIP.</div>
+        <div class="feature"><b>Forensic flags</b>Edits, clock drift, thumbnail mismatches, spoofed types.</div>
+        <div class="feature"><b>Map &amp; timeline</b>Trips, routes, heatmaps, pattern-of-life charts.</div>
+        <div class="feature"><b>Evidence exports</b>SHA-256, JSON, CSV, GeoJSON, KML, case report.</div>
+      </div>
+      <div class="privacy-note"><span data-icon="shield"></span><span><strong>100% private.</strong> Processed locally. Works offline once loaded.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <section id="app" class="hidden">
+    <header class="top">
+      <div class="top-inner">
+        <button class="brand btn ghost" id="homeBtn" type="button" title="Back to start"><span class="brand-mark" data-icon="image"></span><span>MetaPeek</span></button>
+        <span class="count-pill" id="countPill">0 photos</span>
+        <div class="grow"></div>
+        <button class="btn sm" id="addMore" type="button"><span data-icon="upload"></span><span class="hide-sm">Add</span></button>
+        <div class="menu">
+          <button class="btn sm" id="exportBtn" type="button" aria-haspopup="true" aria-expanded="false"><span data-icon="download"></span><span class="hide-sm">Export</span></button>
+          <div class="menu-pop hidden" id="exportMenu" role="menu">
+            <button type="button" data-export="report" role="menuitem"><span data-icon="doc"></span><span>Case report<small>Printable HTML → PDF, with hashes</small></span></button>
+            <button type="button" data-export="json" role="menuitem"><span data-icon="doc"></span><span>JSON<small>Full metadata, all segments</small></span></button>
+            <button type="button" data-export="csv" role="menuitem"><span data-icon="doc"></span><span>CSV<small>One row per file</small></span></button>
+            <button type="button" data-export="geojson" role="menuitem"><span data-icon="pin"></span><span>GeoJSON<small>For QGIS, Mapbox, kepler.gl</small></span></button>
+            <button type="button" data-export="kml" role="menuitem"><span data-icon="pin"></span><span>KML<small>Google Earth, with route</small></span></button>
+          </div>
+        </div>
+        <button class="btn sm primary" id="stripAllBtn" type="button" title="Download metadata-free copies of the photos currently shown"><span data-icon="eraser"></span><span class="hide-sm">Clean &amp; download</span></button>
+        <button class="btn sm icon ghost" id="themeBtn" type="button" title="Toggle dark mode" aria-label="Toggle dark mode"><span data-icon="moon"></span></button>
+        <button class="btn sm ghost" id="clearBtn" type="button">Clear</button>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="stats" id="stats"></div>
+      <nav class="tabs" id="tabs" role="tablist">
+        <button class="tab active" data-tab="photos" role="tab" type="button">Photos</button>
+        <button class="tab" data-tab="forensics" role="tab" type="button">Forensics <span class="badge" id="forensicsBadge">0</span></button>
+        <button class="tab" data-tab="privacy" role="tab" type="button">Privacy</button>
+        <button class="tab" data-tab="places" role="tab" type="button">Places</button>
+        <button class="tab" data-tab="map" role="tab" type="button">Map &amp; travel</button>
+        <button class="tab" data-tab="timeline" role="tab" type="button">Timeline</button>
+        <button class="tab" data-tab="devices" role="tab" type="button">Devices</button>
+      </nav>
+
+      <section id="tab-photos" class="tabpanel">
+        <div class="toolbar" id="filters">
+          <div class="field search"><span data-icon="search"></span><input id="q" type="search" placeholder="Search name, camera, software…" aria-label="Search"></div>
+          <button class="chip active" data-f="all" type="button">All</button>
+          <button class="chip" data-f="gps" type="button">With GPS</button>
+          <button class="chip" data-f="nogps" type="button">No GPS</button>
+          <button class="chip" data-f="flagged" type="button">Flagged</button>
+          <button class="chip" data-f="high" type="button">High risk</button>
+          <span class="sep"></span>
+          <div class="field"><select id="camFilter" aria-label="Camera"><option value="">All devices</option></select></div>
+          <div class="field"><label for="dFrom">From</label><input type="date" id="dFrom"></div>
+          <div class="field"><label for="dTo">To</label><input type="date" id="dTo"></div>
+          <div class="field"><select id="sortSel" aria-label="Sort">
+            <option value="date">Date taken</option><option value="name">Name</option><option value="camera">Camera</option>
+            <option value="risk">Privacy risk</option><option value="flags">Findings</option><option value="size">File size</option>
+          </select></div>
+          <button class="btn sm" id="geoShownBtn" type="button" title="Write a location into the photos currently shown"><span data-icon="pin"></span>Set location</button>
+          <span class="result-count" id="resultCount"></span>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="empty hidden" id="gridEmpty">No photos match these filters.</div>
+      </section>
+
+      <section id="tab-forensics" class="tabpanel hidden"></section>
+      <section id="tab-privacy" class="tabpanel hidden"></section>
+      <section id="tab-map" class="tabpanel hidden">
+        <div class="toolbar">
+          <button class="chip active" data-map="markers" type="button">Markers</button>
+          <button class="chip" data-map="heat" type="button">Heatmap</button>
+          <button class="chip" data-map="route" type="button">Travel route</button>
+          <span class="sep"></span>
+          <button class="chip active" id="conesBtn" type="button" title="Show which way each camera was facing">Camera view cones</button>
+          <span class="sep"></span>
+          <button class="btn sm" id="fitBtn" type="button">Fit to photos</button>
+          <span class="result-count" id="mapNote"></span>
+        </div>
+        <div id="map"></div>
+        <div class="panel" id="tripsPanel" style="margin-top:16px"></div>
+      </section>
+      <section id="tab-timeline" class="tabpanel hidden"></section>
+      <section id="tab-places" class="tabpanel hidden"></section>
+      <section id="tab-devices" class="tabpanel hidden"></section>
+    </main>
+  </section>
+
+  <!-- ============ DETAIL MODAL ============ -->
+  <div id="modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <button class="btn sm icon" id="mPrev" type="button" aria-label="Previous photo"><span data-icon="left"></span></button>
+        <button class="btn sm icon" id="mNext" type="button" aria-label="Next photo"><span data-icon="right"></span></button>
+        <div class="title"><b id="mTitle"></b><div class="pills" id="mPills"></div></div>
+        <button class="btn sm primary" id="mStrip" type="button"><span data-icon="eraser"></span><span class="hide-sm">Clean copy</span></button>
+        <button class="btn sm icon" id="mClose" type="button" aria-label="Close"><span data-icon="x"></span></button>
+      </div>
+      <div class="sheet-body">
+        <div class="sheet-left" id="mLeft"></div>
+        <div class="sheet-right">
+          <nav class="tabs" id="mTabs">
+            <button class="tab active" data-mtab="overview" type="button">Overview</button>
+            <button class="tab" data-mtab="findings" type="button">Findings</button>
+            <button class="tab" data-mtab="privacy" type="button">Privacy</button>
+            <button class="tab" data-mtab="raw" type="button">All metadata</button>
+          </nav>
+          <div class="content" id="mContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="geoDlg" class="geo-dlg" aria-labelledby="geoTitle">
+    <h3 id="geoTitle">Set location</h3>
+    <div class="muted geo-note" id="geoNote"></div>
+    <div class="geo-row">
+      <input id="geoSearch" type="search" placeholder="Search a place, or paste coordinates / a Google Maps link" autocomplete="off" aria-label="Search place">
+      <button class="btn" id="geoSearchBtn" type="button"><span data-icon="search"></span>Find</button>
+    </div>
+    <div id="geoResults"></div>
+    <div id="geoMap"></div>
+    <div class="geo-row">
+      <label class="geo-field">Coordinates (lat, lon)<input id="geoCoords" placeholder="23.780600, 90.407000" autocomplete="off" spellcheck="false"></label>
+      <label class="geo-field sm">Altitude m (optional)<input id="geoAlt" inputmode="decimal" placeholder="—" autocomplete="off"></label>
+    </div>
+    <div class="muted" style="font-size:12px">Click the map or drag the pin to fine-tune.</div>
+    <div class="row">
+      <button class="btn" id="geoCancel" type="button">Cancel</button>
+      <button class="btn primary" id="geoApply" type="button" disabled><span data-icon="download"></span>Save &amp; download</button>
+    </div>
+  </dialog>
+
+  <dialog id="reportDlg">
+    <form method="dialog" id="reportForm">
+      <h3>Case report</h3>
+      <div class="muted" style="font-size:13px">Optional details printed at the top of the report. Covers the photos currently shown by your filters.</div>
+      <label for="rCase">Case / reference ID</label><input id="rCase" autocomplete="off">
+      <label for="rAnalyst">Analyst</label><input id="rAnalyst" autocomplete="off">
+      <label for="rNotes">Notes</label><textarea id="rNotes"></textarea>
+      <div class="row"><button class="btn" value="cancel" type="submit">Cancel</button><button class="btn primary" value="ok" type="submit">Generate report</button></div>
+    </form>
+  </dialog>
+
+  <script src="vendor/exifr.full.umd.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/leaflet/leaflet.markercluster.js"></script>
+  <script src="vendor/leaflet/leaflet-heat.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="vendor/piexif.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/forensics.js"></script>
+  <script src="js/parse.js"></script>
+  <script src="js/strip.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/geotag.js"></script>
+  <script src="js/places.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

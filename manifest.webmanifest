@@ -1,0 +1,11 @@
+{
+  "name": "MetaPeek — Photo metadata analyzer",
+  "short_name": "MetaPeek",
+  "description": "Private, in-browser photo metadata, forensics and cleaning.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0e17",
+  "theme_color": "#5b5bf0",
+  "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
