@@ -1,4 +1,4 @@
-# 🔍 MetaPeek v2
+# 🔍 MetaPeek v2.2 - Massive update
 
 > Drop a photo. See what it's hiding. Then make it hide nothing.
 
